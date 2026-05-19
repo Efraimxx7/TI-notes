@@ -43,6 +43,6 @@ Commands are tested on **Linux (Debian/Ubuntu)**, **Windows 10/11**, and cloud e
 ---
  
 <div align="center">
-Continuously updated as new topics are studied.
+Continuously updated as new topics are studied
  
 </div>
