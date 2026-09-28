@@ -1,326 +1,216 @@
-# 🔀 Git for Cloud Security — Essential Commands
+# 🔀 Git — Essential Commands
 
-> A practical reference of Git commands used in Cloud Security workflows —
-> covering secure development, auditing, secrets management, and team collaboration.
+> A practical reference of Git commands for daily work, team collaboration and fixing mistakes.
 
 ---
 
 ## 📋 Table of Contents
 
-- [Initial Setup and Hardening](#initial-setup-and-hardening)
-- [Repository Management](#repository-management)
-- [Branching and Secure Workflow](#branching-and-secure-workflow)
-- [Staging and Committing Safely](#staging-and-committing-safely)
-- [Commit Signing with GPG](#commit-signing-with-gpg)
-- [Auditing and History Investigation](#auditing-and-history-investigation)
-- [Secrets and Sensitive Data](#secrets-and-sensitive-data)
-- [Remote and Access Control](#remote-and-access-control)
-- [CICD Integration](#cicd-integration)
-- [Incident Response](#incident-response)
+- [Setup](#setup)
+- [Repository Basics](#repository-basics)
+- [Branching](#branching)
+- [Staging & Committing](#staging--committing)
+- [Undoing Changes](#undoing-changes)
+- [History & Investigation](#history--investigation)
+- [Remotes](#remotes)
+- [Tags & Releases](#tags--releases)
+- [Signed Commits (GPG)](#signed-commits-gpg)
+- [Removing Sensitive Files](#removing-sensitive-files)
+- [CI/CD Usage](#cicd-usage)
 - [Quick Reference](#quick-reference)
 - [Recommended Tools](#recommended-tools)
 
 ---
 
-## Initial Setup and Hardening
+## Setup
 
 ```bash
-# Identity configuration (always set before committing)
 git config --global user.name "Your Name"
-git config --global user.email "you@company.com"
-
-# Force GPG signing on all commits globally
-git config --global commit.gpgsign true
-
-# Set default branch name to main
+git config --global user.email "you@example.com"
 git config --global init.defaultBranch main
-
-# Enable credential helper to avoid storing passwords in plaintext
-git config --global credential.helper store
-
-# View all global configurations
-git config --global --list
-
-# Set editor
 git config --global core.editor "nano"
+git config --global credential.helper cache     # keep credentials in memory (not plaintext)
+git config --global --list
 ```
 
 ---
 
-## Repository Management
+## Repository Basics
 
 ```bash
-# Initialize a new repo
 git init
-
-# Clone a repo — prefer SSH in production
-git clone git@github.com:org/repo.git
-git clone https://github.com/org/repo.git
-
-# Check repo status
+git clone git@github.com:user/repo.git          # SSH
+git clone https://github.com/user/repo.git      # HTTPS
 git status
-
-# View remote URLs
 git remote -v
-
-# Add a remote
-git remote add origin git@github.com:org/repo.git
-
-# Remove a remote
+git remote add origin git@github.com:user/repo.git
 git remote remove origin
 ```
 
 ---
 
-## Branching and Secure Workflow
-
-Working on isolated branches prevents accidental exposure of sensitive changes to `main`.
+## Branching
 
 ```bash
-# List all branches (local and remote)
-git branch -a
-
-# Create and switch to a new branch
-git checkout -b feature/security-patch
-
-# Switch between branches
-git checkout main
-
-# Delete a local branch after merge
-git branch -d feature/security-patch
-
-# Force delete a branch (use with caution)
-git branch -D feature/security-patch
-
-# Merge a branch into main
-git checkout main
-git merge feature/security-patch
-
-# Rebase (cleaner history)
-git rebase main
+git branch -a                          # list local and remote branches
+git checkout -b feature/new-feature    # create and switch (or: git switch -c)
+git checkout main                      # switch (or: git switch main)
+git merge feature/new-feature
+git rebase main                        # replay your commits on top of main
+git branch -d feature/new-feature      # delete merged branch
+git branch -D feature/new-feature      # force delete
 ```
 
 ---
 
-## Staging and Committing Safely
+## Staging & Committing
 
 ```bash
-# Stage a specific file
-git add path/to/file.tf
-
-# Stage all changes (review first with git status)
-git add .
-
-# Review what is staged before committing
-git diff --staged
-
-# Commit with a descriptive message
-git commit -m "fix: remove hardcoded AWS credentials from config"
-
-# Amend the last commit message (before pushing)
-git commit --amend -m "fix: revoke and rotate exposed credentials"
-
-# Unstage a file without losing changes
-git restore --staged path/to/file
-
-# Discard local changes in a file
-git restore path/to/file
+git add path/to/file
+git add .                              # stage everything (check git status first)
+git diff                               # unstaged changes
+git diff --staged                      # review before committing
+git commit -m "fix: correct config path"
+git commit --amend -m "new message"    # fix last commit (before pushing)
+git stash                              # save work temporarily
+git stash list
+git stash pop
 ```
 
 ---
 
-## Commit Signing with GPG
-
-Signed commits prove that code was authored by a verified identity — critical in regulated environments.
+## Undoing Changes
 
 ```bash
-# List available GPG keys
-gpg --list-secret-keys --keyid-format=long
+git restore path/to/file               # discard changes in a file
+git restore --staged path/to/file      # unstage a file
+git revert <commit>                    # new commit that undoes another (safe)
+git reset --soft HEAD~1                # undo last commit, keep changes staged
+git reset --hard <commit>              # go back and DISCARD changes (destructive)
+git clean -n                           # preview untracked files to delete
+git reflog                             # recover "lost" commits
+```
 
-# Configure Git to use your GPG key
-git config --global user.signingkey YOUR_KEY_ID
+**Merge conflicts**
 
-# Sign a single commit manually
-git commit -S -m "feat: add IAM role hardening policy"
-
-# Enable automatic signing for all commits
-git config --global commit.gpgsign true
-
-# Verify the signature of a commit
-git log --show-signature -1
-
-# Verify signatures across recent commits
-git log --show-signature --oneline -10
+```bash
+git status                             # see conflicted files
+# edit files, remove <<<<<<< ======= >>>>>>> markers
+git add file.txt
+git commit
+git merge --abort                      # give up on the merge
 ```
 
 ---
 
-## Auditing and History Investigation
-
-Essential for forensic analysis, compliance reviews, and incident investigations.
+## History & Investigation
 
 ```bash
-# View full commit history
 git log
-
-# Compact one-line log with graph
 git log --oneline --graph --decorate --all
-
-# Search commit history by keyword
-git log --all --grep="password"
-git log --all --grep="secret"
-git log --all --grep="key"
-
-# Show who changed what line
-git blame path/to/file.py
-
-# Show what changed in a specific commit
-git show <commit-hash>
-
-# Compare two commits or branches
+git log --all --grep="keyword"         # search commit messages
+git log -p path/to/file                # history of one file
+git log --author="name"
+git log -S "text" --all --oneline      # commits that added/removed a string
+git show <commit>
 git diff <commit-A> <commit-B>
+git blame path/to/file                 # who changed each line
+git cherry-pick <commit>               # copy one commit to current branch
 
-# Find when a bug was introduced (binary search)
+# Find the commit that introduced a bug
 git bisect start
 git bisect bad
-git bisect good <commit-hash>
+git bisect good <commit>
 git bisect reset
-
-# View all activity in the repo including resets and rebases
-git reflog
 ```
 
 ---
 
-## Secrets and Sensitive Data
-
-If credentials or secrets are accidentally committed, act immediately.
+## Remotes
 
 ```bash
-# Check if a file is tracked by Git
-git ls-files path/to/.env
-
-# Remove a file from tracking WITHOUT deleting it locally
-git rm --cached path/to/.env
-
-# Add secrets files to .gitignore
-echo ".env" >> .gitignore
-echo "*.pem" >> .gitignore
-echo "*.key" >> .gitignore
-echo "terraform.tfvars" >> .gitignore
-git add .gitignore
-git commit -m "chore: add secrets files to .gitignore"
-
-# Purge a file from ALL history — modern approach (recommended)
-pip install git-filter-repo
-git filter-repo --path path/to/secrets.txt --invert-paths
-
-# After purging history, force push to remote
-git push origin --force --all
-git push origin --force --tags
-```
-
-> **Warning:** Purging history does not revoke credentials. Always rotate and invalidate any exposed secrets immediately.
-
----
-
-## Remote and Access Control
-
-```bash
-# Fetch updates without merging
 git fetch origin
-
-# Pull latest changes from main
 git pull origin main
+git push origin feature/new-feature
+git push -u origin feature/new-feature   # set upstream
+git push --force-with-lease              # safer force push (own branches only)
+```
 
-# Push changes to remote
-git push origin feature/security-patch
+---
 
-# Push and set upstream tracking
-git push -u origin feature/security-patch
+## Tags & Releases
 
-# Force push (use carefully — only on your own branches)
-git push --force origin feature/security-patch
-
-# List all tags
+```bash
 git tag
-
-# Create a signed tag for a release
-git tag -s v1.0.0 -m "Release v1.0.0"
-
-# Push tags to remote
+git tag v1.0.0
+git tag -a v1.0.0 -m "Release v1.0.0"
 git push origin --tags
+git archive --format=tar.gz --output=release.tar.gz HEAD
+```
 
-# Verify a signed tag
+---
+
+## Signed Commits (GPG)
+
+```bash
+gpg --list-secret-keys --keyid-format=long
+git config --global user.signingkey YOUR_KEY_ID
+git config --global commit.gpgsign true
+git commit -S -m "feat: add new module"
+git log --show-signature -1
+git tag -s v1.0.0 -m "Signed release"
 git tag -v v1.0.0
 ```
 
 ---
 
-## CICD Integration
+## Removing Sensitive Files
 
-Git integrates with tools like GitHub Actions, GitLab CI, and Terraform Cloud.
+If a password, key or `.env` file was committed by mistake:
 
 ```bash
-# Create a deploy key (read-only SSH key for CI/CD runners)
-ssh-keygen -t ed25519 -C "ci-deploy-key" -f ~/.ssh/deploy_key
+git ls-files path/to/.env              # is it tracked?
+git rm --cached path/to/.env           # stop tracking, keep local file
 
-# Clone using SSH in a CI environment
-GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key" git clone git@github.com:org/repo.git
+echo ".env" >> .gitignore
+echo "*.pem" >> .gitignore
+echo "*.key" >> .gitignore
+git add .gitignore
+git commit -m "chore: ignore sensitive files"
 
-# Shallow clone for faster CI pipelines
-git clone --depth 1 git@github.com:org/repo.git
-
-# Create an archive of the repo for artifact deployment
-git archive --format=tar.gz --output=release.tar.gz HEAD
-
-# Check for merge conflicts before merging in scripts
-git merge --no-commit --no-ff feature/branch
-git merge --abort
+# Remove the file from ALL history
+pip install git-filter-repo
+git filter-repo --path path/to/secret.txt --invert-paths
+git push origin --force --all
 ```
+
+> **Important:** removing a file from history does not make the password safe. Always change/revoke the exposed credential.
 
 ---
 
-## Incident Response
-
-When a security incident involves a Git repository.
+## CI/CD Usage
 
 ```bash
-# Preserve current repo state before any changes
-git stash
-git log --all --oneline > incident_log.txt
-
-# Find all commits by a specific author
-git log --all --author="suspected@email.com"
-
-# Search all commits for a specific string across history
-git log -S "ACCESS_KEY" --all --source --oneline
-
-# Revert a dangerous commit without rewriting history
-git revert <commit-hash>
-
-# Create a snapshot tag before incident remediation
-git tag incident/2025-04-28 HEAD
-
-# Reset branch to a safe state (destructive)
-git reset --hard <last-safe-commit-hash>
-git push --force origin main
+ssh-keygen -t ed25519 -C "ci-deploy-key" -f ~/.ssh/deploy_key
+GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key" git clone git@github.com:user/repo.git
+git clone --depth 1 git@github.com:user/repo.git     # shallow clone, faster pipelines
 ```
 
 ---
 
 ## Quick Reference
 
-| Practice | Command |
+| Task | Command |
 |---|---|
-| Never commit secrets | `.gitignore` + `git rm --cached` |
-| Sign all commits | `git config --global commit.gpgsign true` |
+| See what changed | `git status` / `git diff` |
+| Undo a file change | `git restore file` |
+| Undo last commit (keep work) | `git reset --soft HEAD~1` |
+| Safely undo a pushed commit | `git revert <commit>` |
+| Find who changed a line | `git blame file` |
+| Search history | `git log --all --grep="text"` |
+| Save work temporarily | `git stash` / `git stash pop` |
+| Recover lost work | `git reflog` |
 | Prefer SSH over HTTPS | `git clone git@github.com:...` |
-| Audit commit history | `git log --all --grep="secret"` |
-| Verify author identity | `git log --show-signature` |
-| Rotate before purging | Revoke credentials first, then `git filter-repo` |
-| Use branch protection | Configure in GitHub or GitLab settings |
-| Shallow clones for CI | `git clone --depth 1` |
 
 ---
 
@@ -328,17 +218,17 @@ git push --force origin main
 
 | Tool | Purpose |
 |---|---|
-| [truffleHog](https://github.com/trufflesecurity/trufflehog) | Scan Git history for leaked secrets |
-| [gitleaks](https://github.com/gitleaks/gitleaks) | Detect hardcoded credentials in repos |
-| [git-secrets](https://github.com/awslabs/git-secrets) | Prevent committing secrets (AWS) |
-| [pre-commit](https://pre-commit.com/) | Run security hooks before committing |
-| [Checkov](https://www.checkov.io/) | Static analysis for IaC (Terraform, etc.) |
+| [GitHub CLI (gh)](https://cli.github.com/) | Manage repos, PRs and issues from the terminal |
+| [pre-commit](https://pre-commit.com/) | Run checks automatically before each commit |
+| [gitleaks](https://github.com/gitleaks/gitleaks) | Detect passwords/keys accidentally committed |
+| [git-filter-repo](https://github.com/newren/git-filter-repo) | Rewrite history (remove files) |
+| [lazygit](https://github.com/jesseduffield/lazygit) | Terminal UI for Git |
 
 ---
 
 <div align="center">
 
-*Maintained as a personal reference for Cloud Security practices.*
-*Commands tested on Linux environment.*
+*Maintained as a personal reference for daily Git usage.*  
+*Commands tested on Linux.*
 
 </div>
